@@ -8,6 +8,7 @@ from recbole.model.layers import TransformerEncoder
 from sinkhorn_transformer import Autopadder
 from sinkhorn_transformer import SinkhornTransformer
 
+#LogSoftmax, AdaptiveLogSoftmaxWithLoss, 
 class PWLayer(nn.Module):
     """Single Parametric Whitening Layer
     """
