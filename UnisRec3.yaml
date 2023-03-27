@@ -22,7 +22,6 @@ scales: [5, 8, 40]
 MAX_ITEM_LIST_LENGTH: 200
 hyper_len: 6
 
-
 item_drop_ratio: 0.2
 item_drop_coefficient: 0.9
 lambda: 1e-3
