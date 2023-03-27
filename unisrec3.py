@@ -11,6 +11,8 @@ from torch import nn
 import torch.nn.functional as F
 from recbole.model.abstract_recommender import SequentialRecommender
 from recbole.model.layers import TransformerEncoder, HGNN
+import copy
+from recbole.model.sequential_recommender.sasrec import SASRec
 
 
 #SOFT , rela-transformer, Nystromformer, conformer, compressive-transformer-pytorch,sinkhorn-transformer, GraphiT,flash_pytorchm Graph_Transformer_Networks, memory-efficient-attention-pytorch
@@ -21,10 +23,10 @@ def sim(z1: torch.Tensor, z2: torch.Tensor):
     z2 = F.normalize(z2)
     return torch.matmul(z1, z2.permute(0,2,1))
 
-class MBHT(SequentialRecommender):
+class UniSRec(SequentialRecommender):
 
     def __init__(self, config, dataset):
-        super(MBHT, self).__init__(config, dataset)
+        super(UnisRec, self).__init__(config, dataset)
 
         # load parameters info
         self.n_layers = config['n_layers']
