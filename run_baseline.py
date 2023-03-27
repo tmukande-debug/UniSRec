@@ -75,7 +75,7 @@ if __name__ == '__main__':
     args, _ = parser.parse_known_args()
     config_file_list = args.config_files.strip().split(' ') if args.config_files else None
 
-    if args.model in ['FDSA', 'S3Rec']:
+    if args.model in ['FDSA', 'S3Rec', 'MBHT']:
         baseline_func = run_baseline
     else:
         baseline_func = run_recbole
