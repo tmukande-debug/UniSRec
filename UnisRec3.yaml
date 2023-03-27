@@ -23,18 +23,16 @@ MAX_ITEM_LIST_LENGTH: 200
 hyper_len: 6
 
 
-item_attribute: 'class'
-aap_weight: 1.0
-mip_weight: 0.2
-map_weight: 1.0
-sp_weight: 0.5
-train_stage: 'pretrain'
-pretrain_epochs: 300
-save_step: 100
-pre_model_path: ''
-loss_type: 'CE'
+item_drop_ratio: 0.2
+item_drop_coefficient: 0.9
+lambda: 1e-3
 
 plm_suffix: feat1CLS
+plm_suffix_aug: feat2CLS
+train_stage: transductive_ft  # pretrain / inductive_ft / transductive_ft
 plm_size: 768
-adapter_layers: [768, 300]
-train_batch_size: 1024
+adaptor_dropout_prob: 0.2
+adaptor_layers: [768,300]
+temperature: 0.07
+n_exps: 8
+
