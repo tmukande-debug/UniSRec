@@ -10,7 +10,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 from recbole.model.abstract_recommender import SequentialRecommender
-from recbole.model.layers import TransformerEncoder, HGNN
+from Layers.layers import TransformerEncoder, HGNN
 import copy
 from recbole.model.sequential_recommender.sasrec import SASRec
 
@@ -26,7 +26,7 @@ def sim(z1: torch.Tensor, z2: torch.Tensor):
 class UniSRec(SequentialRecommender):
 
     def __init__(self, config, dataset):
-        super(UnisRec, self).__init__(config, dataset)
+        super(UniSRec, self).__init__(config, dataset)
 
         # load parameters info
         self.n_layers = config['n_layers']
@@ -48,7 +48,7 @@ class UniSRec(SequentialRecommender):
         self.enable_ms = config['enable_ms']
         self.dataset = config['dataset']
 
-        self.buy_type = dataset.field2token_id["item_type_list"]['0']
+        #self.buy_type = dataset.field2token_id["item_type_list"]['0']
 
         # load dataset info
         self.mask_token = self.n_items
@@ -60,7 +60,7 @@ class UniSRec(SequentialRecommender):
 
         self.plm_size = dataset.plm_size
         self.plm_embedding = copy.deepcopy(dataset.plm_embedding)
-        self.adapter = MLPLayers(config['adapter_layers'])
+        #self.adapter = MLPLayers(config['adapter_layers'])
         
         #self.type_embedding = nn.Embedding(6, self.hidden_size, padding_idx=0)
         self.item_embedding = nn.Embedding(self.n_items + 1, self.hidden_size, padding_idx=0)  # mask token add 1
