@@ -28,6 +28,21 @@ class UniSRec(SequentialRecommender):
     def __init__(self, config, dataset):
         super(UniSRec, self).__init__(config, dataset)
 
+        self.train_stage = config['train_stage']
+        self.temperature = config['temperature']
+        self.lam = config['lambda']
+
+        assert self.train_stage in [
+            'pretrain', 'inductive_ft', 'transductive_ft'
+        ], f'Unknown train stage: [{self.train_stage}]'
+
+        if self.train_stage in ['pretrain', 'inductive_ft']:
+            self.item_embedding = None
+            # for `transductive_ft`, `item_embedding` is defined in SASRec base model
+        if self.train_stage in ['inductive_ft', 'transductive_ft']:
+            # `plm_embedding` in pre-train stage will be carried via dataloader
+            self.plm_embedding = copy.deepcopy(dataset.plm_embedding)
+
         # load parameters info
         self.n_layers = config['n_layers']
         self.n_heads = config['n_heads']
@@ -176,7 +191,7 @@ class UniSRec(SequentialRecommender):
         n_objs = (torch.count_nonzero(item_seq, dim=1)+1).tolist()
         for batch_id in range(batch_size):
             n_obj = n_objs[batch_id]
-            item_seq[batch_id][n_obj-1] = last_buy[batch_id]
+            #item_seq[batch_id][n_obj-1] = last_buy[batch_id]
             #type_seq[batch_id][n_obj-1] = self.buy_type
 
         sequence_instances = item_seq.cpu().numpy().tolist()
@@ -333,29 +348,42 @@ class UniSRec(SequentialRecommender):
         multi_hot[torch.arange(masked_index.size(0)), masked_index] = 1
         return multi_hot
 
-    def calculate_loss(self, interaction):
+    def pretrain(self, interaction):
         item_seq = interaction[self.ITEM_SEQ]
-        #session_id = interaction['session_id']
-        #item_type = interaction["item_type_list"]
-       #last_buy = interaction["item_id"]
-        masked_item_seq, pos_items, masked_index = self.reconstruct_train_data(item_seq)
+        item_seq_len = interaction[self.ITEM_SEQ_LEN]
+        #item_emb_list = self.moe_adaptor(interaction['item_emb_list'])
+        seq_output = self.forward(item_seq, item_seq_len)
+        seq_output = F.normalize(seq_output, dim=1)
 
-        mask_nums = torch.count_nonzero(pos_items, dim=1)
-        seq_output = self.forward(masked_item_seq,  mask_positions_nums=(masked_index, mask_nums))
-        pred_index_map = self.multi_hot_embed(masked_index, masked_item_seq.size(-1))  # [B*mask_len max_len]
-        # [B mask_len] -> [B mask_len max_len] multi hot
-        pred_index_map = pred_index_map.view(masked_index.size(0), masked_index.size(1), -1)  # [B mask_len max_len]
-        # [B mask_len max_len] * [B max_len H] -> [B mask_len H]
-        # only calculate loss for masked position
-        seq_output = torch.bmm(pred_index_map, seq_output)  # [B mask_len H]
+        # Remove sequences with the same next item
+        pos_id = interaction['item_id']
+        same_pos_id = (pos_id.unsqueeze(1) == pos_id.unsqueeze(0))
+        same_pos_id = torch.logical_xor(same_pos_id, torch.eye(pos_id.shape[0], dtype=torch.bool, device=pos_id.device))
 
-        loss_fct = nn.CrossEntropyLoss(reduction='none')
+        loss_seq_item = self.seq_item_contrastive_task(seq_output, same_pos_id, interaction)
+        loss_seq_seq = self.seq_seq_contrastive_task(seq_output, same_pos_id, interaction)
+        loss = loss_seq_item + self.lam * loss_seq_seq
+        return loss
+
+    def calculate_loss(self, interaction):
+        if self.train_stage == 'pretrain':
+            return self.pretrain(interaction)
+
+        # Loss for fine-tuning
+        item_seq = interaction[self.ITEM_SEQ]
+        item_seq_len = interaction[self.ITEM_SEQ_LEN]
+        #item_emb_list = self.moe_adaptor(self.plm_embedding(item_seq))
+        seq_output = self.forward(item_seq, item_seq_len)
         test_item_emb = self.item_embedding.weight  # [item_num H]
-        logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))  # [B mask_len item_num]
-        targets = (masked_index > 0).float().view(-1)  # [B*mask_len]
+        if self.train_stage == 'transductive_ft':
+            test_item_emb = test_item_emb + self.item_embedding.weight
 
-        loss = torch.sum(loss_fct(logits.view(-1, test_item_emb.size(0)), pos_items.view(-1)) * targets) \
-                / torch.sum(targets)
+        seq_output = F.normalize(seq_output, dim=1)
+        test_item_emb = F.normalize(test_item_emb, dim=1)
+
+        logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1)) / self.temperature
+        pos_items = interaction[self.POS_ITEM_ID]
+        loss = self.loss_fct(logits, pos_items)
         return loss
     
     def predict(self, interaction):
